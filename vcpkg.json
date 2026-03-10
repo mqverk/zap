@@ -1,0 +1,8 @@
+{
+  "name": "zap",
+  "version": "0.1.0",
+  "dependencies": [
+    "cli11",
+    "tomlplusplus"
+  ]
+}
