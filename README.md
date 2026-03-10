@@ -1,91 +1,60 @@
 # zap
-> "Modern C++ development without touching CMake."
 
-`zap` is a CLI tool that makes starting and managing C++ projects as simple as
-`cargo` for Rust or `npm` for JavaScript.  
-It wraps **vcpkg** for dependency management and **CMake** for builds so you
-never have to write a `CMakeLists.txt` by hand.
+A no-nonsense package manager and project scaffolder for C++. The idea is simple: you shouldn't have to write CMake just to start a project or add a library. `zap` handles all of that for you, wrapping vcpkg for dependencies and CMake for builds while keeping both completely out of your way.
 
----
+Think of it like `cargo` for C++.
 
-## Quick start
+## Demo
 
 ```sh
-zap new hello       # create a new project
-cd hello
-zap add fmt         # add a dependency
-zap build           # configure + build (no cmake knowledge required)
-zap run             # run the compiled binary
+zap new demo
+cd demo
+zap add fmt
+zap build       # generates CMakeLists.txt -> cmake configure -> cmake build
+zap run
 ```
 
-That's it.
+That's the whole workflow. No touching CMake, no editing vcpkg manifests by hand.
 
----
+## Getting started
 
-## Installation
-
-### Prerequisites
-
-| Tool | Minimum version | Purpose |
-|------|----------------|---------|
-| CMake | 3.20 | Build system |
-| C++ compiler | GCC 11 / Clang 13 / MSVC 2022 | Compile C++20 |
-| [vcpkg](https://vcpkg.io) | any recent | Dependency manager |
-| git | any | Used by vcpkg |
-
-### Build zap from source
+You'll need CMake 3.20+, a C++20 compiler, and [vcpkg](https://vcpkg.io). Once those are in place, point `VCPKG_ROOT` at your vcpkg install and build zap itself:
 
 ```sh
-# 1. Clone and set up vcpkg (if not already installed)
 git clone https://github.com/microsoft/vcpkg ~/vcpkg
 ~/vcpkg/bootstrap-vcpkg.sh
 export VCPKG_ROOT=$HOME/vcpkg
 
-# 2. Clone zap
-git clone https://github.com/mqverk/zap
-cd zap
-
-# 3. Build
+git clone https://github.com/mqverk/zap && cd zap
 cmake -B build -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
 cmake --build build
-
-# 4. Install (optional)
 sudo cmake --install build
 ```
 
----
+## What a project looks like
 
-## Commands
+Running `zap new demo` gives you:
 
-| Command | Description |
-|---------|-------------|
-| `zap new <name>` | Create a new C++ project |
-| `zap add <pkg>` | Add a runtime dependency |
-| `zap add <pkg> --dev` | Add a dev/test dependency |
-| `zap remove <pkg>` | Remove a dependency |
-| `zap build` | Build the project (Debug) |
-| `zap build --release` | Build in Release mode |
-| `zap run` | Build (if needed) and run |
-| `zap run -- <args>` | Run with arguments |
-| `zap install` | Install all dependencies from manifest |
-| `zap test` | Build and run tests |
-| `zap update` | Update all dependencies |
-| `zap update <pkg>` | Update a specific package |
-| `zap clean` | Remove the build directory |
-| `zap doctor` | Check your development environment |
-| `zap version` | Print zap version |
-| `zap publish` | Publish the project (experimental) |
+```
+demo/
+|-- zap.toml
+|-- vcpkg.json          (auto-generated, don't edit by hand)
+|-- CMakeLists.txt      (auto-generated, same story)
+|-- src/
+|   \-- main.cpp
+|-- include/
+|-- tests/
+|   \-- test_main.cpp
+\-- build/
+```
 
----
-
-## Manifest — `zap.toml`
+`zap.toml` is the only file you actually need to care about:
 
 ```toml
 [project]
-name = "hello"
+name = "demo"
 version = "0.1.0"
 cpp_standard = "20"
-description = "My awesome C++ project"
 
 [dependencies]
 fmt = "*"
@@ -95,99 +64,74 @@ spdlog = "*"
 catch2 = "*"
 ```
 
----
+Every time you run `zap build` or `zap add`, the `CMakeLists.txt` and `vcpkg.json` are regenerated automatically to match whatever is in the manifest.
 
-## Project layout
+## Commands
 
 ```
-hello/
-├── zap.toml          # project manifest (managed by zap)
-├── vcpkg.json        # vcpkg dependency manifest (auto-generated)
-├── CMakeLists.txt    # cmake config       (auto-generated)
-├── src/
-│   └── main.cpp
-├── include/          # public headers
-├── tests/
-│   └── test_main.cpp
-└── build/            # cmake output (git-ignored)
+zap new <name>          create a new project
+zap add <pkg>           add a dependency
+zap add <pkg> --dev     add a dev/test-only dependency
+zap remove <pkg>        remove a dependency
+zap build               build (debug by default)
+zap build --release     build in release mode
+zap run                 build if needed, then run
+zap run -- <args>       pass arguments to the binary
+zap install             install all deps from zap.toml
+zap test                build and run tests via ctest
+zap update              update all dependencies
+zap clean               wipe the build directory
+zap doctor              check your environment is set up correctly
+zap version             print the current zap version
 ```
 
----
+## How the CMake generation works
 
-## Generated `CMakeLists.txt`
-
-When you run `zap build` or `zap add`, zap regenerates your `CMakeLists.txt`
-automatically.  Example output for a project using `fmt` and `catch2`:
+When you add `fmt` and `catch2 --dev`, for example, zap generates something like this:
 
 ```cmake
 cmake_minimum_required(VERSION 3.20)
 
-# vcpkg integration (must appear before project())
 if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
     set(CMAKE_TOOLCHAIN_FILE
         "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
         CACHE STRING "vcpkg toolchain")
 endif()
 
-project(hello VERSION 0.1.0 LANGUAGES CXX)
+project(demo VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(fmt CONFIG REQUIRED)
 
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "src/*.cpp")
+add_executable(demo ${SOURCES})
+target_include_directories(demo PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(demo PRIVATE fmt::fmt)
 
-add_executable(hello ${SOURCES})
-
-target_include_directories(hello PRIVATE ${CMAKE_SOURCE_DIR}/include)
-
-target_link_libraries(hello PRIVATE fmt::fmt)
-
-# Tests
 enable_testing()
 file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS "tests/*.cpp")
 if(TEST_SOURCES)
     find_package(Catch2 CONFIG REQUIRED)
-    add_executable(hello_tests ${TEST_SOURCES})
-    target_link_libraries(hello_tests PRIVATE Catch2::Catch2WithMain fmt::fmt)
-    add_test(NAME all_tests COMMAND hello_tests)
+    add_executable(demo_tests ${TEST_SOURCES})
+    target_link_libraries(demo_tests PRIVATE Catch2::Catch2WithMain fmt::fmt)
+    add_test(NAME all_tests COMMAND demo_tests)
 endif()
 ```
 
----
+zap knows the correct `find_package` name and CMake target for about 50 common vcpkg packages out of the box. For anything not in that list it falls back to a reasonable guess based on the package name.
 
-## Architecture
+## If something's not working
 
-```
-zap/
-├── CMakeLists.txt          # build zap itself
-├── vcpkg.json              # zap's own dependencies
-├── include/zap/
-│   └── version.hpp         # compile-time version constants
-└── src/
-    ├── main.cpp             # entry point, CLI11 app setup
-    ├── cli/
-    │   ├── commands.hpp     # register_commands() declaration
-    │   └── commands.cpp     # all CLI command implementations
-    ├── core/
-    │   ├── manifest.hpp/cpp        # parse / write zap.toml
-    │   ├── cmake_generator.hpp/cpp # generate CMakeLists.txt
-    │   ├── vcpkg_manager.hpp/cpp   # vcpkg discovery & install
-    │   └── project.hpp/cpp         # project scaffolding
-    └── utils/
-        ├── fs.hpp/cpp       # filesystem helpers
-        └── process.hpp/cpp  # cross-platform subprocess execution
-```
-
----
+Run `zap doctor` -- it checks for cmake, a C++ compiler, git, ninja, and vcpkg, and tells you what's missing. Most problems come down to vcpkg not being installed or `VCPKG_ROOT` not being set.
 
 ## Contributing
 
-PRs welcome!  Please keep the code C++20, zero-dependency outside of vcpkg/CMake,
-and follow the existing module boundaries.
+The codebase is split into four layers: `cli/` dispatches commands, `core/` contains the actual logic (manifest parsing, cmake generation, vcpkg integration, project scaffolding), and `utils/` handles filesystem and process execution. Keep things in those boundaries and you'll be fine. C++20, no heavy dependencies.
+
+PRs welcome.
 
 ## License
 
