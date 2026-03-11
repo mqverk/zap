@@ -871,6 +871,31 @@ void cmd_watch() {
 }
 
 // ---------------------------------------------------------------------------
+// Command: zap graph
+// ---------------------------------------------------------------------------
+
+void cmd_graph() {
+    auto manifest = zap::core::Manifest::load_from_cwd();
+
+    std::cout << manifest.project.name
+              << " " << manifest.project.version << "\n";
+
+    bool any = false;
+    for (auto& [name, ver] : manifest.dependencies) {
+        std::cout << "  +-- " << name << " (" << ver << ")\n";
+        any = true;
+    }
+    for (auto& [name, ver] : manifest.dev_dependencies) {
+        std::cout << "  +-- " << name << " (" << ver << ")  [dev]\n";
+        any = true;
+    }
+
+    if (!any) {
+        std::cout << "  (no dependencies)\n";
+    }
+}
+
+// ---------------------------------------------------------------------------
 // CLI registration
 // ---------------------------------------------------------------------------
 
@@ -1103,6 +1128,12 @@ void register_commands(CLI::App& app) {
     {
         auto* sub = app.add_subcommand("watch", "Watch sources and rebuild on changes");
         sub->callback([] { cmd_watch(); });
+    }
+
+    // ---- graph -------------------------------------------------------------
+    {
+        auto* sub = app.add_subcommand("graph", "Print the dependency tree");
+        sub->callback([] { cmd_graph(); });
     }
 }
 
