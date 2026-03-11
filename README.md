@@ -68,21 +68,77 @@ Every time you run `zap build` or `zap add`, the `CMakeLists.txt` and `vcpkg.jso
 
 ## Commands
 
+### Project lifecycle
+
 ```
-zap new <name>          create a new project
-zap add <pkg>           add a dependency
-zap add <pkg> --dev     add a dev/test-only dependency
-zap remove <pkg>        remove a dependency
-zap build               build (debug by default)
-zap build --release     build in release mode
-zap run                 build if needed, then run
-zap run -- <args>       pass arguments to the binary
-zap install             install all deps from zap.toml
-zap test                build and run tests via ctest
-zap update              update all dependencies
-zap clean               wipe the build directory
-zap doctor              check your environment is set up correctly
-zap version             print the current zap version
+zap new <name>                    create a new executable project
+zap new <name> --lib              create a library project
+zap new <name> --template <tpl>   scaffold from a named template
+zap init                          initialise zap in the current directory
+```
+
+### Dependencies
+
+```
+zap add <pkg>                     add a dependency
+zap add <pkg> --dev               add a dev/test-only dependency
+zap remove <pkg>                  remove a dependency
+zap install                       install all deps from zap.toml
+zap update [pkg]                  update all (or one) dependency
+zap list                          list all dependencies in zap.toml
+zap outdated                      check for outdated packages
+zap lock                          generate / update the lockfile
+zap search <pkg>                  search vcpkg for packages
+zap info <pkg>                    show details about a vcpkg package
+zap graph                         print the dependency tree
+```
+
+### Build & run
+
+```
+zap build                         build in debug mode
+zap build --release               build in release mode
+zap build --clean                 clean before building
+zap build --target <target>       build a specific CMake target
+zap build --profile <profile>     use a named build profile
+zap run                           build if needed, then run
+zap run --release                 run the release binary
+zap run -- <args>                 pass arguments to the binary
+zap watch                         watch src/ and rebuild on changes
+zap clean                         wipe the build directory
+zap cache clean                   remove vcpkg build cache (buildtrees/)
+```
+
+### Quality & testing
+
+```
+zap test                          build and run tests via ctest
+zap fmt                           format source files with clang-format
+zap lint                          lint source files with clang-tidy
+zap check                         run static analysis without building
+zap bench                         build (release) and run benchmarks
+zap coverage                      generate HTML test coverage report
+```
+
+### Publishing & registry
+
+```
+zap publish                       publish the project (experimental)
+zap publish --dry-run             simulate publish without uploading
+zap yank <version>                remove a published version
+zap login                         authenticate with a package registry
+zap logout                        remove stored registry credentials
+```
+
+### Utilities
+
+```
+zap config                        list all configuration values
+zap config <key>                  read a configuration value
+zap config <key> <value>          set a configuration value
+zap explain <error>               explain a common compiler / linker error
+zap doctor                        check your environment is set up correctly
+zap version                       print the current zap version
 ```
 
 ## How the CMake generation works
