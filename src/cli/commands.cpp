@@ -731,24 +731,54 @@ void cmd_yank(const std::string& version) {
 }
 
 // ---------------------------------------------------------------------------
-// Commands: zap login / logout / yank
+// Command: zap config [<key> [<value>]]
 // ---------------------------------------------------------------------------
 
-void cmd_login() {
-    std::cout << "  zap login is a no-op for now.\n";
-    std::cout << "  There is no central C++ package registry requiring authentication.\n";
-    std::cout << "  For private vcpkg registries, configure credentials in your git config.\n";
-}
+void cmd_config(const std::string& key, const std::string& value) {
+    auto config_dir = fs::path(std::getenv("HOME") ? std::getenv("HOME") : ".")
+                    / ".config" / "zap";
+    auto config_file = config_dir / "config.toml";
 
-void cmd_logout() {
-    std::cout << "  zap logout is a no-op for now.\n";
-    std::cout << "  For private vcpkg registry credentials, use 'git credential reject'.\n";
-}
+    if (key.empty()) {
+        if (!fs::exists(config_file)) {
+            std::cout << "  No configuration found (" << config_file.string() << ")\n";
+            return;
+        }
+        std::ifstream f(config_file);
+        std::cout << f.rdbuf();
+        return;
+    }
 
-void cmd_yank(const std::string& version) {
-    std::cout << "  zap yank is not yet implemented.\n";
-    std::cout << "  Version to yank: " << version << "\n";
-    std::cout << "  To remove a published vcpkg port, submit a PR to the vcpkg registry.\n";
+    if (value.empty()) {
+        if (!fs::exists(config_file)) { std::cout << "  (not set)\n"; return; }
+        std::ifstream f(config_file);
+        for (std::string line; std::getline(f, line);) {
+            if (line.rfind(key + " ", 0) == 0 || line.rfind(key + "=", 0) == 0) {
+                std::cout << line << "\n";
+                return;
+            }
+        }
+        std::cout << "  (not set)\n";
+        return;
+    }
+
+    zap::utils::ensure_directory(config_dir);
+    std::string content;
+    bool updated = false;
+    if (fs::exists(config_file)) {
+        std::ifstream f(config_file);
+        for (std::string line; std::getline(f, line);) {
+            if (line.rfind(key + " ", 0) == 0 || line.rfind(key + "=", 0) == 0) {
+                content += key + " = \"" + value + "\"\n";
+                updated = true;
+            } else {
+                content += line + "\n";
+            }
+        }
+    }
+    if (!updated) content += key + " = \"" + value + "\"\n";
+    zap::utils::write_file(config_file, content);
+    std::cout << "  Set " << key << " = \"" << value << "\"\n";
 }
 
 // ---------------------------------------------------------------------------
@@ -890,6 +920,16 @@ void register_commands(CLI::App& app) {
     {
         auto* sub = app.add_subcommand("init", "Initialize a zap project in the current directory");
         sub->callback([] { cmd_init(); });
+
+    // ---- config ------------------------------------------------------------
+    {
+        auto* sub = app.add_subcommand("config", "Get or set zap configuration values");
+        auto* key = new std::string;
+        auto* val = new std::string;
+        sub->add_option("key", *key, "Config key (omit to list all)");
+        sub->add_option("value", *val, "New value (omit to read)");
+        sub->callback([key, val] { cmd_config(*key, *val); });
+    }
     }
 
     // ---- fmt ---------------------------------------------------------------
