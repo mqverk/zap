@@ -826,6 +826,51 @@ void cmd_cache_clean() {
 }
 
 // ---------------------------------------------------------------------------
+// Command: zap watch
+// ---------------------------------------------------------------------------
+
+void cmd_watch() {
+    auto root = zap::utils::require_project_root();
+
+    bool have_inotify = zap::utils::program_exists("inotifywait");
+    bool have_fswatch = zap::utils::program_exists("fswatch");
+    if (!have_inotify && !have_fswatch) {
+        print_error("No file-watch utility found.\n"
+                    "  Linux: install inotify-tools\n"
+                    "  macOS: brew install fswatch");
+        return;
+    }
+
+    std::cout << "  Watching src/ and include/ for changes...\n";
+    std::cout << "  (Press Ctrl+C to stop)\n\n";
+
+    // Build once immediately before entering the watch loop.
+    int rc = zap::utils::run_command("cmake --build " + (root / "build").string());
+    if (rc != 0) std::cout << "  Initial build failed — watching for fixes...\n\n";
+
+    while (true) {
+        if (have_inotify) {
+            rc = zap::utils::run_command(
+                "inotifywait -r -e modify,create,delete,move"
+                " --include '\\.(cpp|cxx|cc|c|hpp|hxx|h)$'"
+                " \"" + (root / "src").string() + "\""
+                " \"" + (root / "include").string() + "\" > /dev/null 2>&1");
+        } else {
+            rc = zap::utils::run_command(
+                "fswatch -1 -r"
+                " \"" + (root / "src").string() + "\""
+                " \"" + (root / "include").string() + "\" > /dev/null 2>&1");
+        }
+
+        if (rc != 0) break; // interrupted (Ctrl+C)
+
+        std::cout << "  Change detected — rebuilding...\n";
+        zap::utils::run_command("cmake --build " + (root / "build").string());
+        std::cout << "\n";
+    }
+}
+
+// ---------------------------------------------------------------------------
 // CLI registration
 // ---------------------------------------------------------------------------
 
@@ -1052,6 +1097,12 @@ void register_commands(CLI::App& app) {
             auto* sub = cache->add_subcommand("clean", "Remove cached build artifacts");
             sub->callback([] { cmd_cache_clean(); });
         }
+    }
+
+    // ---- watch -------------------------------------------------------------
+    {
+        auto* sub = app.add_subcommand("watch", "Watch sources and rebuild on changes");
+        sub->callback([] { cmd_watch(); });
     }
 }
 
