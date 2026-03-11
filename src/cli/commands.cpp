@@ -510,6 +510,32 @@ void cmd_outdated() {
 }
 
 // ---------------------------------------------------------------------------
+// Command: zap lock
+// ---------------------------------------------------------------------------
+
+void cmd_lock() {
+    auto manifest = zap::core::Manifest::load_from_cwd();
+    const auto root = manifest.path.parent_path();
+
+    auto vcpkg = require_vcpkg();
+    if (!vcpkg) return;
+
+    // vcpkg generates vcpkg-lock.json automatically; we just ensure
+    // vcpkg.json is up to date and run install.
+    zap::core::write_vcpkg_manifest(
+        manifest.project.name,
+        manifest.project.version,
+        manifest.all_dependency_names(),
+        root);
+
+    std::cout << "  Generating lockfile via vcpkg...\n";
+    bool ok = zap::core::vcpkg_install_all(root, *vcpkg);
+    if (!ok) throw std::runtime_error("vcpkg install failed during lock.");
+
+    std::cout << "  Lockfile updated (vcpkg.json + vcpkg installed refs).\n";
+}
+
+// ---------------------------------------------------------------------------
 // Command: zap search <pkg>
 // ---------------------------------------------------------------------------
 
@@ -980,6 +1006,24 @@ void register_commands(CLI::App& app) {
         auto* ver = new std::string;
         sub->add_option("version", *ver, "Version to yank")->required();
         sub->callback([ver] { cmd_yank(*ver); });
+    }
+
+    // ---- list --------------------------------------------------------------
+    {
+        auto* sub = app.add_subcommand("list", "List all dependencies in zap.toml");
+        sub->callback([] { cmd_list(); });
+    }
+
+    // ---- outdated ----------------------------------------------------------
+    {
+        auto* sub = app.add_subcommand("outdated", "Check for outdated dependencies");
+        sub->callback([] { cmd_outdated(); });
+    }
+
+    // ---- lock --------------------------------------------------------------
+    {
+        auto* sub = app.add_subcommand("lock", "Generate / update the dependency lockfile");
+        sub->callback([] { cmd_lock(); });
     }
 }
 
