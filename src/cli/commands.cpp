@@ -471,6 +471,38 @@ void cmd_publish(bool dry_run) {
 }
 
 // ---------------------------------------------------------------------------
+// Command: zap search <pkg>
+// ---------------------------------------------------------------------------
+
+void cmd_search(const std::string& pkg) {
+    auto vcpkg = require_vcpkg();
+    if (!vcpkg) return;
+
+    std::cout << "  Searching vcpkg for '" << pkg << "'...\n\n";
+    int rc = zap::utils::run_command(
+        "\"" + vcpkg->executable.string() + "\" search " + pkg);
+    if (rc != 0) {
+        throw std::runtime_error("vcpkg search failed.");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Command: zap info <pkg>
+// ---------------------------------------------------------------------------
+
+void cmd_info(const std::string& pkg) {
+    auto vcpkg = require_vcpkg();
+    if (!vcpkg) return;
+
+    int rc = zap::utils::run_command(
+        "\"" + vcpkg->executable.string() + "\" show " + pkg);
+    if (rc != 0) {
+        zap::utils::run_command(
+            "\"" + vcpkg->executable.string() + "\" search \"^" + pkg + "$\"");
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Command: zap init
 // ---------------------------------------------------------------------------
 
