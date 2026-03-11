@@ -808,6 +808,24 @@ void cmd_config(const std::string& key, const std::string& value) {
 }
 
 // ---------------------------------------------------------------------------
+// Command: zap cache clean
+// ---------------------------------------------------------------------------
+
+void cmd_cache_clean() {
+    auto vcpkg = require_vcpkg();
+    if (!vcpkg) return;
+
+    auto buildtrees_dir = vcpkg->root / "buildtrees";
+    if (fs::exists(buildtrees_dir)) {
+        fs::remove_all(buildtrees_dir);
+        std::cout << "  Removed " << buildtrees_dir.string() << "\n";
+        std::cout << "  Cache cleared.\n";
+    } else {
+        std::cout << "  vcpkg build cache was already empty.\n";
+    }
+}
+
+// ---------------------------------------------------------------------------
 // CLI registration
 // ---------------------------------------------------------------------------
 
@@ -1024,6 +1042,16 @@ void register_commands(CLI::App& app) {
     {
         auto* sub = app.add_subcommand("lock", "Generate / update the dependency lockfile");
         sub->callback([] { cmd_lock(); });
+    }
+
+    // ---- cache -------------------------------------------------------------
+    {
+        auto* cache = app.add_subcommand("cache", "Manage the local vcpkg build cache");
+        cache->require_subcommand(1);
+        {
+            auto* sub = cache->add_subcommand("clean", "Remove cached build artifacts");
+            sub->callback([] { cmd_cache_clean(); });
+        }
     }
 }
 
