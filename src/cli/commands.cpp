@@ -564,6 +564,50 @@ void cmd_init() {
 }
 
 // ---------------------------------------------------------------------------
+// Command: zap fmt
+// ---------------------------------------------------------------------------
+
+void cmd_fmt() {
+    if (!zap::utils::program_exists("clang-format")) {
+        print_error("clang-format not found. Install it from your package manager.");
+        return;
+    }
+    auto root = zap::utils::require_project_root();
+    std::cout << "  Formatting source files with clang-format...\n";
+    int rc = zap::utils::run_command_in(
+        "find src include -name '*.cpp' -o -name '*.hpp' | xargs clang-format -i",
+        root);
+    if (rc != 0) throw std::runtime_error("clang-format failed.");
+    std::cout << "  Done.\n";
+}
+
+// ---------------------------------------------------------------------------
+// Command: zap lint
+// ---------------------------------------------------------------------------
+
+void cmd_lint() {
+    if (!zap::utils::program_exists("clang-tidy")) {
+        print_error("clang-tidy not found. Install it from your package manager.");
+        return;
+    }
+    auto root = zap::utils::require_project_root();
+    auto cc = root / "build" / "compile_commands.json";
+    if (!fs::exists(cc)) {
+        std::cout << "  compile_commands.json not found -- running cmake configure first...\n";
+        auto vcpkg = require_vcpkg();
+        std::string conf = cmake_configure_cmd(false, vcpkg)
+                         + " -DCMAKE_EXPORT_COMPILE_COMMANDS=ON";
+        int rc = zap::utils::run_command_in(conf, root);
+        if (rc != 0) throw std::runtime_error("cmake configure failed.");
+    }
+    std::cout << "  Running clang-tidy...\n";
+    int rc = zap::utils::run_command_in(
+        "find src -name '*.cpp' | xargs clang-tidy -p build", root);
+    if (rc != 0) throw std::runtime_error("clang-tidy reported issues.");
+    std::cout << "  Lint clean.\n";
+}
+
+// ---------------------------------------------------------------------------
 // CLI registration
 // ---------------------------------------------------------------------------
 
@@ -702,6 +746,18 @@ void register_commands(CLI::App& app) {
     {
         auto* sub = app.add_subcommand("init", "Initialize a zap project in the current directory");
         sub->callback([] { cmd_init(); });
+    }
+
+    // ---- fmt ---------------------------------------------------------------
+    {
+        auto* sub = app.add_subcommand("fmt", "Format source files with clang-format");
+        sub->callback([] { cmd_fmt(); });
+    }
+
+    // ---- lint --------------------------------------------------------------
+    {
+        auto* sub = app.add_subcommand("lint", "Lint source files with clang-tidy");
+        sub->callback([] { cmd_lint(); });
     }
 }
 
