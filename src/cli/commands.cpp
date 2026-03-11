@@ -710,6 +710,48 @@ void cmd_coverage() {
 }
 
 // ---------------------------------------------------------------------------
+// Commands: zap login / logout / yank
+// ---------------------------------------------------------------------------
+
+void cmd_login() {
+    std::cout << "  zap login is a no-op for now.\n";
+    std::cout << "  There is no central C++ package registry requiring authentication.\n";
+    std::cout << "  For private vcpkg registries, configure credentials in your git config.\n";
+}
+
+void cmd_logout() {
+    std::cout << "  zap logout is a no-op for now.\n";
+    std::cout << "  For private vcpkg registry credentials, use 'git credential reject'.\n";
+}
+
+void cmd_yank(const std::string& version) {
+    std::cout << "  zap yank is not yet implemented.\n";
+    std::cout << "  Version to yank: " << version << "\n";
+    std::cout << "  To remove a published vcpkg port, submit a PR to the vcpkg registry.\n";
+}
+
+// ---------------------------------------------------------------------------
+// Commands: zap login / logout / yank
+// ---------------------------------------------------------------------------
+
+void cmd_login() {
+    std::cout << "  zap login is a no-op for now.\n";
+    std::cout << "  There is no central C++ package registry requiring authentication.\n";
+    std::cout << "  For private vcpkg registries, configure credentials in your git config.\n";
+}
+
+void cmd_logout() {
+    std::cout << "  zap logout is a no-op for now.\n";
+    std::cout << "  For private vcpkg registry credentials, use 'git credential reject'.\n";
+}
+
+void cmd_yank(const std::string& version) {
+    std::cout << "  zap yank is not yet implemented.\n";
+    std::cout << "  Version to yank: " << version << "\n";
+    std::cout << "  To remove a published vcpkg port, submit a PR to the vcpkg registry.\n";
+}
+
+// ---------------------------------------------------------------------------
 // CLI registration
 // ---------------------------------------------------------------------------
 
@@ -878,6 +920,26 @@ void register_commands(CLI::App& app) {
     {
         auto* sub = app.add_subcommand("coverage", "Generate test coverage report");
         sub->callback([] { cmd_coverage(); });
+    }
+
+    // ---- login -------------------------------------------------------------
+    {
+        auto* sub = app.add_subcommand("login", "Authenticate with a package registry");
+        sub->callback([] { cmd_login(); });
+    }
+
+    // ---- logout ------------------------------------------------------------
+    {
+        auto* sub = app.add_subcommand("logout", "Remove stored registry credentials");
+        sub->callback([] { cmd_logout(); });
+    }
+
+    // ---- yank --------------------------------------------------------------
+    {
+        auto* sub = app.add_subcommand("yank", "Remove a published version");
+        auto* ver = new std::string;
+        sub->add_option("version", *ver, "Version to yank")->required();
+        sub->callback([ver] { cmd_yank(*ver); });
     }
 }
 
