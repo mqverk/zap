@@ -456,7 +456,14 @@ static void cmd_run_watch() {
 // Command: zap publish  (stub -- no central C++ registry yet)
 // ---------------------------------------------------------------------------
 
-void cmd_publish() {
+void cmd_publish(bool dry_run) {
+    if (dry_run) {
+        std::cout << "  [dry-run] Would publish package (no files uploaded).\n";
+        auto manifest = zap::core::Manifest::load_from_cwd();
+        std::cout << "  name:    " << manifest.project.name << "\n";
+        std::cout << "  version: " << manifest.project.version << "\n";
+        return;
+    }
     std::cout << "  zap publish is not yet implemented.\n";
     std::cout << "  C++ does not have a universal package registry.\n";
     std::cout << "  Consider publishing your vcpkg port to the vcpkg registry:\n";
@@ -571,7 +578,9 @@ void register_commands(CLI::App& app) {
     // ---- publish -----------------------------------------------------------
     {
         auto* sub = app.add_subcommand("publish", "Publish the project (experimental)");
-        sub->callback([] { cmd_publish(); });
+        auto* dry_run = new bool{false};
+        sub->add_flag("--dry-run", *dry_run, "Simulate publish without uploading");
+        sub->callback([dry_run] { cmd_publish(*dry_run); });
     }
 
     // ---- version -----------------------------------------------------------
