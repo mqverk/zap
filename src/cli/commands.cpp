@@ -164,9 +164,19 @@ void cmd_remove(const std::string& package) {
 // Command: zap build [--release]
 // ---------------------------------------------------------------------------
 
-void cmd_build(bool release) {
+void cmd_build(bool release, bool clean,
+               const std::string& target_platform,
+               const std::string& profile) {
     auto manifest = zap::core::Manifest::load_from_cwd();
     const auto root = manifest.path.parent_path();
+
+    if (clean) {
+        auto build_dir = root / "build";
+        if (fs::exists(build_dir)) {
+            std::cout << "  Cleaning build directory...\n";
+            fs::remove_all(build_dir);
+        }
+    }
 
     auto vcpkg = require_vcpkg();
     std::optional<fs::path> toolchain;
@@ -180,7 +190,12 @@ void cmd_build(bool release) {
     zap::utils::ensure_directory(root / "build");
 
     // cmake configure
-    const std::string configure_cmd = cmake_configure_cmd(release, vcpkg);
+    std::string configure_cmd = cmake_configure_cmd(release, vcpkg);
+    if (!target_platform.empty())
+        configure_cmd += " -DCMAKE_SYSTEM_NAME=" + target_platform;
+    if (!profile.empty())
+        configure_cmd += " -DCMAKE_BUILD_TYPE=" + profile;
+
     std::cout << "  Configuring...\n";
     int rc = zap::utils::run_command_in(configure_cmd, root);
     if (rc != 0) {
@@ -213,7 +228,7 @@ void cmd_run(const std::vector<std::string>& extra_args) {
     auto exe = locate_executable(root, manifest.project.name);
     if (exe.empty()) {
         std::cout << "  Executable not found, building first...\n\n";
-        cmd_build(false);
+        cmd_build(false, false, "", "");
         exe = locate_executable(root, manifest.project.name);
     }
 
@@ -339,7 +354,7 @@ void cmd_test() {
     const auto root = manifest.path.parent_path();
 
     // Build in debug mode first.
-    cmd_build(false);
+    cmd_build(false, false, "", "");
 
     std::cout << "\n  Running tests...\n\n";
     int rc = zap::utils::run_command_in("ctest --output-on-failure", root / "build");
@@ -459,8 +474,16 @@ void register_commands(CLI::App& app) {
     {
         auto* sub = app.add_subcommand("build", "Build the project");
         auto* release = new bool{false};
+        auto* clean = new bool{false};
+        auto* tgt = new std::string;
+        auto* prof = new std::string;
         sub->add_flag("--release", *release, "Build in release mode");
-        sub->callback([release] { cmd_build(*release); });
+        sub->add_flag("--clean", *clean, "Clean build directory before building");
+        sub->add_option("--target", *tgt, "Target platform (sets CMAKE_SYSTEM_NAME)");
+        sub->add_option("--profile", *prof, "CMake build type (Debug/Release/RelWithDebInfo)");
+        sub->callback([release, clean, tgt, prof] {
+            cmd_build(*release, *clean, *tgt, *prof);
+        });
     }
 
     // ---- run ---------------------------------------------------------------
