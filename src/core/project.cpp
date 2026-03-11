@@ -81,7 +81,7 @@ compile_commands.json
 const std::string make_readme(const std::string& name) {
     return
         "# " + name + "\n\n"
-        "A C++ project managed by [zap](https://github.com/zapbuild/zap).\n\n"
+        "A C++ project managed by [zap](https://github.com/mqverk/zap).\n\n"
         "## Build\n\n"
         "```sh\nzap build\n```\n\n"
         "## Run\n\n"

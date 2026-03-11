@@ -8,6 +8,6 @@ constexpr int         VERSION_MINOR = 1;
 constexpr int         VERSION_PATCH = 0;
 
 constexpr const char* DESCRIPTION   = "The zero-friction C++ package manager";
-constexpr const char* HOMEPAGE      = "https://github.com/zapbuild/zap";
+constexpr const char* HOMEPAGE      = "https://github.com/mqverk/zap";
 
 } // namespace zap
