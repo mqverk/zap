@@ -9,6 +9,7 @@
 #include "zap/version.hpp"
 
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <optional>
 #include <stdexcept>
@@ -79,10 +80,13 @@ fs::path locate_executable(const fs::path& project_root,
 // Command: zap new <project-name>
 // ---------------------------------------------------------------------------
 
-void cmd_new(const std::string& name, const std::string& std_version) {
+void cmd_new(const std::string& name, const std::string& std_version,
+             bool is_lib, const std::string& tpl) {
     zap::core::NewProjectOptions opts;
     opts.name         = name;
     opts.cpp_standard = std_version;
+    opts.is_library   = is_lib;
+    if (!tpl.empty()) opts.template_name = tpl;
     zap::core::create_new_project(opts);
 }
 
@@ -418,10 +422,14 @@ void register_commands(CLI::App& app) {
         auto* sub = app.add_subcommand("new", "Create a new C++ project");
         auto* name = new std::string;
         auto* std_ver = new std::string{"20"};
+        auto* is_lib = new bool{false};
+        auto* tpl = new std::string;
         sub->add_option("name", *name, "Project name")->required();
         sub->add_option("--std", *std_ver, "C++ standard (default: 20)");
-        sub->callback([name, std_ver] {
-            cmd_new(*name, *std_ver);
+        sub->add_flag("--lib", *is_lib, "Create a library project");
+        sub->add_option("--template", *tpl, "Project template name");
+        sub->callback([name, std_ver, is_lib, tpl] {
+            cmd_new(*name, *std_ver, *is_lib, *tpl);
         });
     }
 
