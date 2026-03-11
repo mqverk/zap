@@ -644,6 +644,32 @@ void cmd_check() {
 }
 
 // ---------------------------------------------------------------------------
+// Command: zap bench
+// ---------------------------------------------------------------------------
+
+void cmd_bench() {
+    auto manifest = zap::core::Manifest::load_from_cwd();
+    const auto root = manifest.path.parent_path();
+
+    cmd_build(true, false, "", ""); // benchmarks run in release
+
+    std::cout << "\n  Running benchmarks...\n\n";
+    int rc = zap::utils::run_command_in(
+        "ctest --output-on-failure -L benchmark", root / "build");
+    if (rc != 0) {
+        for (auto& entry : fs::directory_iterator(root / "build")) {
+            auto n = entry.path().filename().string();
+            if (n.find("bench") != std::string::npos) {
+                zap::utils::run_command("\"" + entry.path().string() + "\"");
+                return;
+            }
+        }
+        throw std::runtime_error("No benchmark targets found. "
+            "Add a CTest label 'benchmark' or name your binary '*bench*'.");
+    }
+}
+
+// ---------------------------------------------------------------------------
 // CLI registration
 // ---------------------------------------------------------------------------
 
@@ -800,6 +826,12 @@ void register_commands(CLI::App& app) {
     {
         auto* sub = app.add_subcommand("check", "Run static analysis without building");
         sub->callback([] { cmd_check(); });
+    }
+
+    // ---- bench -------------------------------------------------------------
+    {
+        auto* sub = app.add_subcommand("bench", "Build (release) and run benchmarks");
+        sub->callback([] { cmd_bench(); });
     }
 }
 
