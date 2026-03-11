@@ -670,6 +670,46 @@ void cmd_bench() {
 }
 
 // ---------------------------------------------------------------------------
+// Command: zap coverage
+// ---------------------------------------------------------------------------
+
+void cmd_coverage() {
+    if (!zap::utils::program_exists("lcov") &&
+        !zap::utils::program_exists("gcovr")) {
+        print_error("lcov or gcovr not found. Install one to generate coverage reports.");
+        return;
+    }
+    auto root = zap::utils::require_project_root();
+    auto vcpkg = require_vcpkg();
+    std::string conf = cmake_configure_cmd(false, vcpkg)
+                     + " -DCMAKE_CXX_FLAGS=\"--coverage\""
+                     + " -DCMAKE_EXE_LINKER_FLAGS=\"--coverage\"";
+    std::cout << "  Configuring with coverage instrumentation...\n";
+    if (zap::utils::run_command_in(conf, root) != 0)
+        throw std::runtime_error("cmake configure failed.");
+    if (zap::utils::run_command_in("cmake --build build", root) != 0)
+        throw std::runtime_error("Build failed.");
+    if (zap::utils::run_command_in("ctest --output-on-failure", root / "build") != 0)
+        throw std::runtime_error("Tests failed.");
+    std::cout << "\n  Generating coverage report...\n";
+    int rc = 0;
+    if (zap::utils::program_exists("gcovr")) {
+        rc = zap::utils::run_command_in(
+            "gcovr --root . --exclude tests/ --html-details coverage.html", root);
+        if (rc == 0) std::cout << "  Report written to coverage.html\n";
+    } else {
+        rc = zap::utils::run_command_in(
+            "lcov --capture --directory build/ --output-file coverage.info --quiet", root);
+        if (rc == 0) {
+            rc = zap::utils::run_command_in(
+                "genhtml coverage.info --output-directory coverage/ --quiet", root);
+            if (rc == 0) std::cout << "  Report written to coverage/index.html\n";
+        }
+    }
+    if (rc != 0) throw std::runtime_error("Coverage report generation failed.");
+}
+
+// ---------------------------------------------------------------------------
 // CLI registration
 // ---------------------------------------------------------------------------
 
@@ -832,6 +872,12 @@ void register_commands(CLI::App& app) {
     {
         auto* sub = app.add_subcommand("bench", "Build (release) and run benchmarks");
         sub->callback([] { cmd_bench(); });
+    }
+
+    // ---- coverage ----------------------------------------------------------
+    {
+        auto* sub = app.add_subcommand("coverage", "Generate test coverage report");
+        sub->callback([] { cmd_coverage(); });
     }
 }
 
