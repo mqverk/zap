@@ -471,6 +471,28 @@ void cmd_publish(bool dry_run) {
 }
 
 // ---------------------------------------------------------------------------
+// Command: zap init
+// ---------------------------------------------------------------------------
+
+void cmd_init() {
+    auto cwd = fs::current_path();
+    auto manifest_path = cwd / "zap.toml";
+
+    if (fs::exists(manifest_path)) {
+        print_error("zap.toml already exists in this directory.");
+        return;
+    }
+
+    std::string name = cwd.filename().string();
+    zap::core::NewProjectOptions opts;
+    opts.name = name;
+    opts.init_in_place = true;
+    zap::core::create_new_project(opts, cwd);
+
+    std::cout << "  Initialized project '" << name << "' in current directory.\n";
+}
+
+// ---------------------------------------------------------------------------
 // CLI registration
 // ---------------------------------------------------------------------------
 
@@ -587,6 +609,12 @@ void register_commands(CLI::App& app) {
     {
         auto* sub = app.add_subcommand("version", "Print zap version");
         sub->callback([] { cmd_version(); });
+    }
+
+    // ---- init --------------------------------------------------------------
+    {
+        auto* sub = app.add_subcommand("init", "Initialize a zap project in the current directory");
+        sub->callback([] { cmd_init(); });
     }
 }
 
