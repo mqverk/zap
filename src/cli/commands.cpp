@@ -608,6 +608,42 @@ void cmd_lint() {
 }
 
 // ---------------------------------------------------------------------------
+// Command: zap check
+// ---------------------------------------------------------------------------
+
+void cmd_check() {
+    auto root = zap::utils::require_project_root();
+    bool found = false;
+
+    if (zap::utils::program_exists("clang-tidy")) {
+        found = true;
+        auto cc = root / "build" / "compile_commands.json";
+        if (!fs::exists(cc)) {
+            auto vcpkg = require_vcpkg();
+            std::string conf = cmake_configure_cmd(false, vcpkg)
+                             + " -DCMAKE_EXPORT_COMPILE_COMMANDS=ON";
+            zap::utils::run_command_in(conf, root);
+        }
+        std::cout << "  Running clang-tidy (static analysis)...\n";
+        zap::utils::run_command_in(
+            "find src -name '*.cpp' | xargs clang-tidy -p build --quiet", root);
+    }
+
+    if (zap::utils::program_exists("cppcheck")) {
+        found = true;
+        std::cout << "  Running cppcheck...\n";
+        zap::utils::run_command_in("cppcheck --enable=all --quiet src/", root);
+    }
+
+    if (!found) {
+        std::cout << "  No static analysis tools found.\n";
+        std::cout << "  Install clang-tidy or cppcheck for source checking.\n";
+        return;
+    }
+    std::cout << "  Check complete.\n";
+}
+
+// ---------------------------------------------------------------------------
 // CLI registration
 // ---------------------------------------------------------------------------
 
@@ -758,6 +794,12 @@ void register_commands(CLI::App& app) {
     {
         auto* sub = app.add_subcommand("lint", "Lint source files with clang-tidy");
         sub->callback([] { cmd_lint(); });
+    }
+
+    // ---- check -------------------------------------------------------------
+    {
+        auto* sub = app.add_subcommand("check", "Run static analysis without building");
+        sub->callback([] { cmd_check(); });
     }
 }
 
