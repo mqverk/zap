@@ -896,6 +896,91 @@ void cmd_graph() {
 }
 
 // ---------------------------------------------------------------------------
+// Command: zap explain
+// ---------------------------------------------------------------------------
+
+void cmd_explain(const std::string& code) {
+    struct Pattern {
+        std::string keyword;
+        std::string title;
+        std::string explanation;
+    };
+
+    static const std::vector<Pattern> patterns = {
+        { "undefined reference",
+          "Undefined reference (linker error)",
+          "A function or variable is declared but not defined.\n"
+          "  Fixes:\n"
+          "    1. Make sure the .cpp file defining the symbol is compiled.\n"
+          "    2. Add the correct library to target_link_libraries() in CMakeLists.txt.\n"
+          "    3. If from a package, run `zap add <package>` then rebuild." },
+
+        { "find_package",
+          "CMake find_package failure",
+          "CMake cannot locate an installed package.\n"
+          "  Fixes:\n"
+          "    1. Run `zap install` to install dependencies via vcpkg.\n"
+          "    2. Pass -DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts/buildsystems/vcpkg.cmake.\n"
+          "    3. Check that the package name matches what vcpkg provides." },
+
+        { "no matching function",
+          "No matching function / overload resolution failure",
+          "The compiler cannot find a function overload matching the argument types.\n"
+          "  Fixes:\n"
+          "    1. Check argument types — add explicit casts if needed.\n"
+          "    2. Include the correct header.\n"
+          "    3. Ensure you are using the right namespace." },
+
+        { "implicit conversion",
+          "Implicit conversion warning / error",
+          "A value is being converted to a narrower or incompatible type implicitly.\n"
+          "  Fix: add an explicit cast, e.g. static_cast<TargetType>(value)." },
+
+        { "multiple definition",
+          "Multiple definition (linker error)",
+          "A symbol is defined more than once across translation units.\n"
+          "  Fixes:\n"
+          "    1. Move the definition to a .cpp file; keep only a declaration in the header.\n"
+          "    2. Guard non-inline definitions with 'inline' or move to a .cpp file.\n"
+          "    3. Check that headers are not compiled directly as source files." },
+
+        { "segmentation fault",
+          "Segmentation fault (runtime crash)",
+          "The program accessed memory it does not own.\n"
+          "  Common causes:\n"
+          "    1. Null pointer dereference.\n"
+          "    2. Out-of-bounds array/vector access.\n"
+          "    3. Use-after-free.\n"
+          "  Tip: build with `zap build --profile debug` and run under AddressSanitizer:\n"
+          "       add -fsanitize=address to CXXFLAGS." },
+
+        { "cannot open source file",
+          "Cannot open source / header file",
+          "An #include path cannot be resolved.\n"
+          "  Fixes:\n"
+          "    1. Check spelling of the header name.\n"
+          "    2. Add the directory to target_include_directories() in CMakeLists.txt.\n"
+          "    3. Run `zap install` if the header comes from a vcpkg package." },
+    };
+
+    std::string lower = code;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+
+    bool found = false;
+    for (auto& p : patterns) {
+        if (lower.find(p.keyword) != std::string::npos) {
+            std::cout << "  [" << p.title << "]\n\n  " << p.explanation << "\n\n";
+            found = true;
+        }
+    }
+
+    if (!found) {
+        std::cout << "  No built-in explanation for: " << code << "\n";
+        std::cout << "  Try searching https://stackoverflow.com or the compiler docs.\n";
+    }
+}
+
+// ---------------------------------------------------------------------------
 // CLI registration
 // ---------------------------------------------------------------------------
 
@@ -1134,6 +1219,14 @@ void register_commands(CLI::App& app) {
     {
         auto* sub = app.add_subcommand("graph", "Print the dependency tree");
         sub->callback([] { cmd_graph(); });
+    }
+
+    // ---- explain -----------------------------------------------------------
+    {
+        auto* sub = app.add_subcommand("explain", "Explain a common compiler or linker error");
+        auto* code = new std::string;
+        sub->add_option("error", *code, "Error message or keyword to explain")->required();
+        sub->callback([code] { cmd_explain(*code); });
     }
 }
 
