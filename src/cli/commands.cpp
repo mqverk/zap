@@ -217,11 +217,20 @@ void cmd_build(bool release, bool clean,
     std::cout << "\n  Build succeeded.\n";
 }
 
+// Forward declaration -- defined later in this file.
+static void cmd_run_watch();
+
 // ---------------------------------------------------------------------------
 // Command: zap run [-- <args...>]
 // ---------------------------------------------------------------------------
 
-void cmd_run(const std::vector<std::string>& extra_args) {
+void cmd_run(const std::vector<std::string>& extra_args,
+             bool release, bool watch) {
+    if (watch) {
+        cmd_run_watch();
+        return;
+    }
+
     auto manifest = zap::core::Manifest::load_from_cwd();
     const auto root = manifest.path.parent_path();
 
@@ -415,7 +424,36 @@ void cmd_version() {
 }
 
 // ---------------------------------------------------------------------------
-// Command: zap publish  (stub – no central C++ registry yet)
+// Command: zap run --watch  (rebuild + rerun on file changes)
+// ---------------------------------------------------------------------------
+
+static void cmd_run_watch() {
+    auto root = zap::utils::require_project_root();
+    auto manifest = zap::core::Manifest::load_from_cwd();
+
+    if (!zap::utils::program_exists("inotifywait") &&
+        !zap::utils::program_exists("fswatch")) {
+        print_error("No file-watch utility found.\n"
+                    "         Install inotify-tools (Linux) or fswatch (macOS).");
+        return;
+    }
+
+    std::cout << "  Watching for changes -- rebuilding and running on each save...\n\n";
+    std::string exe_name = manifest.project.name;
+#ifdef __APPLE__
+    std::string watch_cmd =
+        "fswatch -o src/ include/ | xargs -n1 -I{} sh -c "
+        "'cmake --build build && ./build/" + exe_name + "'";
+#else
+    std::string watch_cmd =
+        "while inotifywait -r -e modify,create,delete src/ include/ 2>/dev/null; do "
+        "cmake --build build && ./build/" + exe_name + "; done";
+#endif
+    zap::utils::run_command_in(watch_cmd, root);
+}
+
+// ---------------------------------------------------------------------------
+// Command: zap publish  (stub -- no central C++ registry yet)
 // ---------------------------------------------------------------------------
 
 void cmd_publish() {
@@ -490,8 +528,12 @@ void register_commands(CLI::App& app) {
     {
         auto* sub = app.add_subcommand("run", "Build (if needed) and run the executable");
         auto* extra = new std::vector<std::string>;
+        auto* release = new bool{false};
+        auto* watch = new bool{false};
         sub->add_option("args", *extra, "Arguments forwarded to the executable");
-        sub->callback([extra] { cmd_run(*extra); });
+        sub->add_flag("--release", *release, "Build and run in release mode");
+        sub->add_flag("--watch", *watch, "Rebuild and re-run on file changes");
+        sub->callback([extra, release, watch] { cmd_run(*extra, *release, *watch); });
     }
 
     // ---- install -----------------------------------------------------------
