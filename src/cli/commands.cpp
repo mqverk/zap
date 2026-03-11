@@ -616,6 +616,22 @@ void register_commands(CLI::App& app) {
     }
 
     // ---- test --------------------------------------------------------------
+
+    // ---- search ------------------------------------------------------------
+    {
+        auto* sub = app.add_subcommand("search", "Search vcpkg for packages");
+        auto* pkg = new std::string;
+        sub->add_option("package", *pkg, "Search query")->required();
+        sub->callback([pkg] { cmd_search(*pkg); });
+    }
+
+    // ---- info --------------------------------------------------------------
+    {
+        auto* sub = app.add_subcommand("info", "Show details about a vcpkg package");
+        auto* pkg = new std::string;
+        sub->add_option("package", *pkg, "Package name")->required();
+        sub->callback([pkg] { cmd_info(*pkg); });
+    }
     {
         auto* sub = app.add_subcommand("test", "Build and run tests");
         sub->callback([] { cmd_test(); });
