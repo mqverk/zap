@@ -471,6 +471,45 @@ void cmd_publish(bool dry_run) {
 }
 
 // ---------------------------------------------------------------------------
+// Command: zap list
+// ---------------------------------------------------------------------------
+
+void cmd_list() {
+    auto manifest = zap::core::Manifest::load_from_cwd();
+
+    std::cout << "  Dependencies for " << manifest.project.name << ":\n\n";
+
+    bool any = false;
+    for (auto& [name, ver] : manifest.dependencies) {
+        std::cout << "    " << name << " = \"" << ver << "\"\n";
+        any = true;
+    }
+    for (auto& [name, ver] : manifest.dev_dependencies) {
+        std::cout << "    " << name << " = \"" << ver << "\"  (dev)\n";
+        any = true;
+    }
+
+    if (!any) std::cout << "    (no dependencies listed)\n";
+}
+
+// ---------------------------------------------------------------------------
+// Command: zap outdated
+// ---------------------------------------------------------------------------
+
+void cmd_outdated() {
+    auto vcpkg = require_vcpkg();
+    if (!vcpkg) return;
+
+    std::cout << "  Checking for outdated packages...\n\n";
+    int rc = zap::utils::run_command(
+        "\"" + vcpkg->executable.string() + "\" list");
+    if (rc != 0) {
+        throw std::runtime_error("vcpkg list failed.");
+    }
+    std::cout << "\n  Tip: Update your vcpkg baseline to pick up newer versions.\n";
+}
+
+// ---------------------------------------------------------------------------
 // Command: zap search <pkg>
 // ---------------------------------------------------------------------------
 
