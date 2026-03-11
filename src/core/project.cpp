@@ -16,13 +16,35 @@ namespace {
 // Embedded templates
 // ---------------------------------------------------------------------------
 
-// Default main.cpp written when a new project is created.
+// Default main.cpp written when a new executable project is created.
 constexpr const char* MAIN_CPP_TEMPLATE = R"cpp(#include <iostream>
 
 int main() {
     std::cout << "Hello from zap!\n";
     return 0;
 }
+)cpp";
+
+// Default lib.hpp/lib.cpp written when --lib is used.
+constexpr const char* LIB_HPP_TEMPLATE = R"cpp(#pragma once
+
+namespace {NAME} {{
+
+void hello();
+
+}} // namespace {NAME}
+)cpp";
+
+constexpr const char* LIB_CPP_TEMPLATE = R"cpp(#include "{NAME}/{NAME}.hpp"
+#include <iostream>
+
+namespace {NAME} {{
+
+void hello() {{
+    std::cout << "Hello from {NAME}!\n";
+}}
+
+}} // namespace {NAME}
 )cpp";
 
 // Minimal test stub – requires Catch2 (add with: zap add catch2 --dev)
@@ -77,27 +99,28 @@ const std::string make_readme(const std::string& name) {
 void create_new_project(const NewProjectOptions& opts,
                         const std::filesystem::path& parent_dir)
 {
-    const auto project_dir = parent_dir / opts.name;
+    // For init_in_place, parent_dir IS already the target directory.
+    // Otherwise create a new sub-directory named opts.name.
+    const auto dir = opts.init_in_place ? parent_dir : parent_dir / opts.name;
 
-    if (std::filesystem::exists(project_dir)) {
+    if (!opts.init_in_place && std::filesystem::exists(dir)) {
         throw std::runtime_error(
-            "error: directory already exists: " + project_dir.string());
+            "error: directory already exists: " + dir.string());
     }
 
     std::cout << "  Creating  " << opts.name << "\n";
 
     // ---- Directory structure -----------------------------------------------
-    zap::utils::ensure_directory(project_dir / "src");
-    zap::utils::ensure_directory(project_dir / "include");
+    zap::utils::ensure_directory(dir / "src");
+    zap::utils::ensure_directory(dir / "include" / opts.name);
     if (opts.create_tests) {
-        zap::utils::ensure_directory(project_dir / "tests");
+        zap::utils::ensure_directory(dir / "tests");
     }
-    // build/ is created by cmake, but create the directory so it's visible.
-    zap::utils::ensure_directory(project_dir / "build");
+    zap::utils::ensure_directory(dir / "build");
 
     // ---- zap.toml ----------------------------------------------------------
     Manifest manifest;
-    manifest.path               = project_dir / "zap.toml";
+    manifest.path               = dir / "zap.toml";
     manifest.project.name       = opts.name;
     manifest.project.version    = opts.version;
     manifest.project.cpp_standard = opts.cpp_standard;
@@ -107,35 +130,56 @@ void create_new_project(const NewProjectOptions& opts,
     std::cout << "  Writing   zap.toml\n";
 
     // ---- vcpkg.json --------------------------------------------------------
-    write_vcpkg_manifest(opts.name, opts.version, {}, project_dir);
+    write_vcpkg_manifest(opts.name, opts.version, {}, dir);
     std::cout << "  Writing   vcpkg.json\n";
 
     // ---- CMakeLists.txt ----------------------------------------------------
-    write_cmakelists(manifest, project_dir);
+    write_cmakelists(manifest, dir);
     std::cout << "  Writing   CMakeLists.txt\n";
 
-    // ---- src/main.cpp ------------------------------------------------------
-    zap::utils::write_file(project_dir / "src" / "main.cpp", MAIN_CPP_TEMPLATE);
-    std::cout << "  Writing   src/main.cpp\n";
+    // ---- Source files ------------------------------------------------------
+    const bool make_lib = opts.is_library ||
+                         (!opts.template_name.empty() && opts.template_name == "lib");
+    if (make_lib) {
+        auto replace_name = [&](std::string s) -> std::string {
+            for (std::size_t pos = 0;
+                 (pos = s.find("{NAME}", pos)) != std::string::npos; ) {
+                s.replace(pos, 6, opts.name);
+                pos += opts.name.size();
+            }
+            return s;
+        };
+        zap::utils::write_file(dir / "include" / opts.name / (opts.name + ".hpp"),
+                               replace_name(LIB_HPP_TEMPLATE));
+        zap::utils::write_file(dir / "src" / (opts.name + ".cpp"),
+                               replace_name(LIB_CPP_TEMPLATE));
+        std::cout << "  Writing   include/" << opts.name << "/" << opts.name << ".hpp\n";
+        std::cout << "  Writing   src/" << opts.name << ".cpp\n";
+    } else {
+        zap::utils::write_file(dir / "src" / "main.cpp", MAIN_CPP_TEMPLATE);
+        std::cout << "  Writing   src/main.cpp\n";
+    }
 
     // ---- tests/  stub ------------------------------------------------------
     if (opts.create_tests) {
-        zap::utils::write_file(project_dir / "tests" / "test_main.cpp", TEST_STUB_TEMPLATE);
+        zap::utils::write_file(dir / "tests" / "test_main.cpp", TEST_STUB_TEMPLATE);
         std::cout << "  Writing   tests/test_main.cpp\n";
     }
 
     // ---- .gitignore --------------------------------------------------------
-    zap::utils::write_file(project_dir / ".gitignore", GITIGNORE_TEMPLATE);
+    zap::utils::write_file(dir / ".gitignore", GITIGNORE_TEMPLATE);
     std::cout << "  Writing   .gitignore\n";
 
     // ---- README.md ---------------------------------------------------------
-    zap::utils::write_file(project_dir / "README.md", make_readme(opts.name));
+    zap::utils::write_file(dir / "README.md", make_readme(opts.name));
     std::cout << "  Writing   README.md\n";
 
     std::cout << "\n";
     std::cout << "  Project '" << opts.name << "' created successfully!\n\n";
-    std::cout << "  Next steps:\n";
-    std::cout << "    cd " << opts.name << "\n";
+    if (!opts.init_in_place) {
+        std::cout << "  Next steps:\n";
+        std::cout << "    cd " << opts.name << "\n";
+    }
     std::cout << "    zap build\n";
     std::cout << "    zap run\n";
 }
