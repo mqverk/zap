@@ -11,7 +11,10 @@ struct NewProjectOptions {
     std::string version      = "0.1.0";
     std::string cpp_standard = "20";
     std::string description;
-    bool        create_tests = true;
+    std::string template_name;
+    bool        create_tests  = true;
+    bool        is_library    = false;
+    bool        init_in_place = false;
 };
 
 // Scaffold a new project directory under parent_dir.
